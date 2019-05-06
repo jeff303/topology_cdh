@@ -167,10 +167,12 @@ def main(args):
 
     if args.sdc_version:
         logger.info('args.sdc_version = %s', args.sdc_version)
+        os_major_version = 7 if cdh_version_tuple >= EARLIEST_CDH_VERSION_WITH_CENTOS7 else 6
         data_collector = sdc.StreamsetsDataCollector(args.sdc_version,
                                                      args.namespace or DEFAULT_NAMESPACE,
-                                                     args.registry)
-        sdc_parcel_image = data_collector.image_name
+                                                     args.registry,
+                                                     os_major_version)
+        sdc_parcel_image = data_collector.full_image_name
         logger.debug('Adding SDC parcel image %s to CM nodes ...', sdc_parcel_image)
         for node in nodes:
             node.volumes.append(sdc_parcel_image)
@@ -348,7 +350,7 @@ def main(args):
         version = args.sdc_version.rsplit('-')[0]
         cm_cluster.wait_for_parcel_stage(product=product, version=version, stage='DOWNLOADED')
         sdc_parcel = cm_cluster.parcel(product=product, version=version, stage='DOWNLOADED')
-        sdc_parcel.distribute(timeout=900).activate(timeout=600)
+        sdc_parcel.distribute(timeout=1200).activate(timeout=600)
 
     if args.include_services:
         service_types_to_leave = args.include_services.upper().split(',')
@@ -489,6 +491,8 @@ def _format_hdfs_namenodes(deployment, cluster_name, primary_node):
                 'sudo -u hdfs hdfs dfs -mkdir -p /user/history',
                 'sudo -u hdfs hdfs dfs -chmod -R 1777 /user/history',
                 'sudo -u hdfs hdfs dfs -chown mapred:hadoop /user/history',
+                'sudo -u hdfs hdfs dfs -mkdir /user/sdc',
+                'sudo -u hdfs hdfs dfs -chown sdc:sdc /user/sdc',
                 'sudo -u hdfs hdfs dfs -chmod 777 /']
     primary_node.execute(' && '.join(commands))
     deployment.stop_service(cluster_name=cluster_name, service_name=service_name)
